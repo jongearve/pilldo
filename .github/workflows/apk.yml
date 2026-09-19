@@ -30,8 +30,6 @@ jobs:
           distribution: temurin
           java-version: 21
 
-      - uses: android-actions/setup-android@v3
-
       - name: Instalar y preparar la interfaz
         working-directory: ${{ steps.find.outputs.dir }}
         run: |
