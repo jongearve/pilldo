@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Poquito</string>
+    <string name="title_activity_main">Poquito</string>
+    <string name="package_name">com.poquito.app</string>
+    <string name="custom_url_scheme">com.poquito.app</string>
+</resources>
