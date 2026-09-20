@@ -54,6 +54,7 @@
   let state = { tasks: [], routines: [], settings: {}, meta: {} };
   let isPackaged = false;
   let viewDate = dateKey();
+  let weekStart = dateKey();          // la tira muestra 7 días desde aquí (por defecto, desde hoy)
   let lastToday = viewDate;
   let lastChangedId = null;
   let editingId = null;
@@ -287,6 +288,30 @@
     $('#day').title = viewDate === dateKey() ? '' : 'Ir a hoy';
   }
 
+  function renderWeek() {
+    const wrap = $('#week');
+    const today = dateKey();
+    while (viewDate < weekStart) weekStart = addDays(weekStart, -7);
+    while (viewDate > addDays(weekStart, 6)) weekStart = addDays(weekStart, 7);
+    const start = weekStart;
+    wrap.textContent = '';
+    for (let i = 0; i < 7; i++) {
+      const key = addDays(start, i);
+      const d = parseKey(key);
+      const open = state.tasks.some((t) =>
+        t.status !== 'done' && (key === today ? t.date <= today : t.date === key));
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'wk' + (key === today ? ' is-today' : '') + (key < today ? ' is-past' : '');
+      b.dataset.date = key;
+      b.setAttribute('aria-pressed', String(key === viewDate));
+      b.setAttribute('aria-label', d.toLocaleDateString('es', { weekday: 'long', day: 'numeric', month: 'long' }));
+      b.innerHTML = `<span class="wk-l">${d.toLocaleDateString('es', { weekday: 'narrow' }).toUpperCase()}</span>` +
+        `<span class="wk-n">${d.getDate()}</span><span class="wk-dot${open ? ' on' : ''}"></span>`;
+      wrap.appendChild(b);
+    }
+  }
+
   function renderProgress(tasks) {
     const total = tasks.length;
     const done = tasks.filter((t) => t.status === 'done').length;
@@ -401,6 +426,7 @@
 
     document.body.classList.toggle('sticker', isSticker());
     renderHeader();
+    renderWeek();
     renderProgress(tasks);
     $('#add-form').hidden = viewDate < dateKey();
     renderList(tasks);
@@ -533,7 +559,7 @@
     document.body.classList.remove('dragging');
     list.querySelectorAll('.drop-gap').forEach((n) => n.remove());
     list.querySelectorAll('.drop-hover').forEach((n) => n.classList.remove('drop-hover'));
-    document.querySelectorAll('.nav-btn').forEach((n) => n.classList.remove('can-drop', 'drop-hover'));
+    document.querySelectorAll('.nav-btn, .wk').forEach((n) => n.classList.remove('can-drop', 'drop-hover'));
   }
 
   function bindGestures() {
@@ -543,7 +569,7 @@
 
     const navUnder = (x, y) => {
       const el = document.elementFromPoint(x, y);
-      const btn = el && el.closest && el.closest('.nav-btn');
+      const btn = el && el.closest && el.closest('.nav-btn, .wk');
       return btn && btn.classList.contains('can-drop') ? btn : null;
     };
 
@@ -564,6 +590,9 @@
       document.body.classList.add('dragging');
       $('#next').classList.add('can-drop');
       if (addDays(viewDate, -1) >= dateKey()) $('#prev').classList.add('can-drop');
+      document.querySelectorAll('.wk').forEach((b) => {
+        if (b.dataset.date >= dateKey() && b.dataset.date !== viewDate) b.classList.add('can-drop');
+      });
       window.api.haptic();
       updateDragTarget(g.y);
       g.scroller = setInterval(() => {
@@ -583,7 +612,8 @@
       if (cur.mode === 'drag') {
         const nav = commitIt ? navUnder(cur.x, cur.y) : null;
         if (nav && drag) {
-          const id = drag.id, date = addDays(viewDate, nav.id === 'next' ? 1 : -1);
+          const id = drag.id;
+          const date = nav.dataset.date || addDays(viewDate, nav.id === 'next' ? 1 : -1);
           cleanupDrag();
           moveToDate(id, date);
         } else if (commitIt) {
@@ -645,7 +675,7 @@
         g.clone.style.transform = `translate(${dx}px, ${dy}px) scale(1.03)`;
         updateDragTarget(g.y);
         const nav = navUnder(g.x, g.y);
-        document.querySelectorAll('.nav-btn').forEach((n) => n.classList.toggle('drop-hover', n === nav));
+        document.querySelectorAll('.nav-btn, .wk').forEach((n) => n.classList.toggle('drop-hover', n === nav));
       }
     });
 
@@ -666,7 +696,23 @@
 
     $('#prev').addEventListener('click', () => { viewDate = addDays(viewDate, -1); render(); });
     $('#next').addEventListener('click', () => { viewDate = addDays(viewDate, 1); render(); });
-    $('#day').addEventListener('click', () => { viewDate = dateKey(); render(); });
+    $('#day').addEventListener('click', () => { viewDate = dateKey(); weekStart = viewDate; render(); });
+    $('#week').addEventListener('click', (e) => {
+      const b = e.target.closest('.wk');
+      if (b) { viewDate = b.dataset.date; render(); }
+    });
+    // Deslizar la tira: semana anterior o siguiente
+    {
+      const week = $('#week');
+      let sx = null;
+      week.addEventListener('pointerdown', (e) => { sx = e.clientX; });
+      week.addEventListener('pointerup', (e) => {
+        if (sx === null) return;
+        const dx = e.clientX - sx; sx = null;
+        if (Math.abs(dx) > 60) { viewDate = addDays(viewDate, dx < 0 ? 7 : -7); render(); }
+      });
+      week.addEventListener('pointercancel', () => { sx = null; });
+    }
     $('#settings-btn').addEventListener('click', openSettings);
     $('#toast-undo').addEventListener('click', () => { const fn = undoFn; hideToast(); if (fn) fn(); });
 
@@ -696,7 +742,16 @@
 
     // Cuando vuelves a la app (o cambia el día) se actualiza todo
     document.addEventListener('visibilitychange', () => { if (!document.hidden) checkDay(); });
-    window.api.onResume(() => checkDay());
+    window.api.onResume(async () => {
+      const fresh = await window.api.reload();
+      if (fresh && !editingId) {
+        state = fresh;
+        if (rollover()) save();
+        render();
+      } else {
+        checkDay();
+      }
+    });
     // Botón "atrás" de Android: cierra lo que esté abierto; si no, deja la app en segundo plano
     window.api.onBack(() => {
       if (!$('#sheet').hidden) { closeSheet(); return true; }
@@ -711,7 +766,7 @@
     const today = dateKey();
     let changed = false;
     if (today !== lastToday) {
-      if (viewDate === lastToday) viewDate = today;
+      if (viewDate === lastToday) { viewDate = today; weekStart = today; }
       lastToday = today;
       changed = true;
     }

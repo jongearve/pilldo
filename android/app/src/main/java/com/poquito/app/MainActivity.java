@@ -8,6 +8,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         EdgeToEdge.enable(this);
+        registerPlugin(PoquitoWidgetPlugin.class);
         super.onCreate(savedInstanceState);
     }
 }

@@ -4,4 +4,8 @@
     <string name="title_activity_main">Poquito</string>
     <string name="package_name">com.poquito.app</string>
     <string name="custom_url_scheme">com.poquito.app</string>
+    <string name="widget_chip_desc">Tu tarea actual, con un círculo para marcarla como hecha.</string>
+    <string name="widget_sticker_desc">Tus tareas de hoy en pastillas, siempre a la vista.</string>
+    <string name="widget_mark_done">Marcar como hecha</string>
+    <string name="widget_add">Añadir tarea</string>
 </resources>

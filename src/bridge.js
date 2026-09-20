@@ -1,11 +1,12 @@
 // Puente entre la interfaz (app.js) y Android: guardado, avisos, botón atrás y vibración.
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, registerPlugin } from '@capacitor/core';
 import { Preferences } from '@capacitor/preferences';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import { App } from '@capacitor/app';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 
 const native = Capacitor.isNativePlatform();
+const PoquitoWidget = native ? registerPlugin('PoquitoWidget') : null;
 const KEY = 'poquito-state-v1';
 
 const pad = (n) => String(n).padStart(2, '0');
@@ -34,6 +35,22 @@ async function readRaw() {
   try { return localStorage.getItem(KEY); } catch { return null; }
 }
 
+// Avisa a los widgets de la pantalla de inicio de que cambiaron las tareas
+function refreshWidgets() {
+  if (PoquitoWidget) PoquitoWidget.refresh().catch(() => {});
+}
+
+function parseState(raw) {
+  const p = JSON.parse(raw);
+  const base = defaultState();
+  return {
+    tasks: Array.isArray(p.tasks) ? p.tasks : [],
+    routines: Array.isArray(p.routines) ? p.routines : [],
+    settings: { ...base.settings, ...(p.settings || {}) },
+    meta: { ...base.meta, ...(p.meta || {}) },
+  };
+}
+
 let writeTimer = null;
 function persist(state) {
   clearTimeout(writeTimer);
@@ -41,6 +58,7 @@ function persist(state) {
     const value = JSON.stringify(state);
     try { await Preferences.set({ key: KEY, value }); }
     catch { try { localStorage.setItem(KEY, value); } catch { /* nada */ } }
+    refreshWidgets();
   }, 200);
 }
 
@@ -167,24 +185,18 @@ window.api = {
     let state = defaultState();
     try {
       const raw = await readRaw();
-      if (raw) {
-        const p = JSON.parse(raw);
-        const base = defaultState();
-        state = {
-          tasks: Array.isArray(p.tasks) ? p.tasks : [],
-          routines: Array.isArray(p.routines) ? p.routines : [],
-          settings: { ...base.settings, ...(p.settings || {}) },
-          meta: { ...base.meta, ...(p.meta || {}) },
-        };
-      }
+      if (raw) state = parseState(raw);
     } catch { /* datos ilegibles: empezamos limpio */ }
     currentState = state;
     await ensureChannels();
     reschedule(state);
+    refreshWidgets();
     return { state, isPackaged: true };
   },
 
   save(state) {
+    state.meta = state.meta || {};
+    state.meta.updatedAt = Date.now();
     currentState = state;
     persist(state);
     // la primera vez que hay una tarea, pedimos permiso para los avisos
@@ -195,6 +207,19 @@ window.api = {
     }
     clearTimeout(debounce);
     debounce = setTimeout(() => reschedule(state), 800);
+  },
+
+  // Si un widget cambió algo mientras la app estaba en segundo plano, lo traemos
+  async reload() {
+    try {
+      const raw = await readRaw();
+      if (!raw) return null;
+      const fresh = parseState(raw);
+      const mine = (currentState && currentState.meta && currentState.meta.updatedAt) || 0;
+      const theirs = (fresh.meta && fresh.meta.updatedAt) || 0;
+      if (theirs > mine) { currentState = fresh; reschedule(fresh); return fresh; }
+    } catch { /* nada */ }
+    return null;
   },
 
   requestNotifications,
