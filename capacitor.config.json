@@ -1,0 +1,17 @@
+{
+  "appId": "com.poquito.app",
+  "appName": "Poquito",
+  "webDir": "www",
+  "android": {},
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_poquito",
+      "iconColor": "#5847D6"
+    },
+    "SystemBars": {
+      "insetsHandling": "css",
+      "initialViewportFitValueHint": "cover",
+      "style": "DEFAULT"
+    }
+  }
+}
