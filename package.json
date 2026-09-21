@@ -1,30 +1,23 @@
 {
-  "name": "poquito",
+  "name": "poquito-mobile",
   "version": "1.0.0",
-  "description": "Poquito: tareas pequeñas, una a la vez, siempre a mano en la bandeja.",
-  "main": "main.js",
-  "author": "Poquito",
-  "license": "MIT",
+  "private": true,
+  "description": "Poquito para Android (Capacitor)",
   "scripts": {
-    "start": "electron .",
-    "dist": "electron-builder --win"
+    "build": "node scripts/build.mjs",
+    "sync": "npm run build && npx cap sync android",
+    "android": "npm run sync && npx cap open android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/local-notifications": "^8.3.1",
+    "@capacitor/preferences": "^8.0.1"
   },
   "devDependencies": {
-    "electron": "^44.4.3",
-    "electron-builder": "^26.15.3"
-  },
-  "build": {
-    "appId": "com.poquito.app",
-    "productName": "Poquito",
-    "files": ["main.js", "preload.js", "src/**", "assets/**", "package.json"],
-    "win": {
-      "target": ["nsis", "portable"],
-      "icon": "assets/icon.ico"
-    },
-    "nsis": {
-      "oneClick": true,
-      "perMachine": false,
-      "deleteAppDataOnUninstall": false
-    }
+    "@capacitor/cli": "^8.5.2",
+    "esbuild": "^0.28.2"
   }
 }

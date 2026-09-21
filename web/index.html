@@ -66,6 +66,28 @@
       </header>
 
       <div class="settings-body">
+        <div class="account" id="account">
+          <p class="acc-title"><strong>Cuenta y sincronización</strong></p>
+          <p class="acc-help" id="acc-unconf" hidden>La sincronización aún no está configurada. Sigue la guía SUPABASE.md y pega los datos en <code>web/sync-config.js</code>.</p>
+          <form id="acc-form" autocomplete="on">
+            <p class="acc-help">Con una cuenta, tus tareas son las mismas en el teléfono y en el computador.</p>
+            <input class="field acc-input" type="email" id="acc-email" placeholder="Correo" autocomplete="username" spellcheck="false" autocapitalize="none">
+            <input class="field acc-input" type="password" id="acc-pass" placeholder="Contraseña (mínimo 6)" autocomplete="current-password">
+            <div class="acc-actions">
+              <button class="btn" id="acc-signin" type="submit">Iniciar sesión</button>
+              <button class="btn quiet" id="acc-signup" type="button">Crear cuenta</button>
+            </div>
+          </form>
+          <div id="acc-in" hidden>
+            <p class="acc-help" id="acc-status"></p>
+            <div class="acc-actions">
+              <button class="btn" id="acc-sync" type="button">Sincronizar ahora</button>
+              <button class="btn quiet" id="acc-out" type="button">Cerrar sesión</button>
+            </div>
+          </div>
+          <p class="acc-msg" id="acc-msg" role="status"></p>
+        </div>
+
         <label class="row">
           <span class="row-text">
             <strong>Aviso de la mañana</strong>
@@ -115,6 +137,8 @@
 
   </main>
   <script src="bridge.js"></script>
+  <script src="sync-config.js"></script>
+  <script src="sync.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

@@ -51,7 +51,7 @@
   };
 
   /* ---------- Estado ---------- */
-  let state = { tasks: [], routines: [], settings: {}, meta: {} };
+  let state = { tasks: [], routines: [], energy: {}, energyAt: {}, tomb: {}, jar: [], settings: {}, meta: {} };
   let isPackaged = false;
   let viewDate = dateKey();
   let weekStart = dateKey();          // la tira muestra 7 días desde aquí (por defecto, desde hoy)
@@ -62,7 +62,12 @@
   let toastTimer = null;
   let undoFn = null;
 
-  const save = () => window.api.save(state);
+  let sync = null;
+  const save = () => {
+    window.PoquitoSync.stamp(state);       // pone la hora a lo que cambió (para poder fusionar con otros equipos)
+    window.api.save(state);
+    if (sync) sync.schedule();
+  };
   const isSticker = () => false;   // en el celular no hay modo pegatina
   const isMobile = true;
 
@@ -94,7 +99,7 @@
       if (day < r.start || (r.skip || []).includes(day)) continue;
       if (state.tasks.some((t) => t.routineId === r.id && t.date === day)) continue;
       state.tasks.push({
-        id: uid(), text: r.text, status: 'todo', date: day,
+        id: `rt_${r.id}_${day}`, text: r.text, status: 'todo', date: day,
         routineId: r.id, createdAt: Date.now(),
       });
       changed = true;
@@ -433,8 +438,90 @@
     lastChangedId = null;
   }
 
+  /* ---------- Cuenta y sincronización ---------- */
+  function ago(ts) {
+    if (!ts) return 'aún no se ha sincronizado';
+    const m = Math.round((Date.now() - ts) / 60000);
+    if (m < 1) return 'hace un momento';
+    if (m < 60) return `hace ${m} min`;
+    return new Date(ts).toLocaleString('es', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' });
+  }
+
+  function renderAccount(st) {
+    if (!sync) return;
+    const conf = sync.configured, inn = sync.signedIn();
+    $('#acc-unconf').hidden = conf;
+    $('#acc-form').hidden = !conf || inn;
+    $('#acc-in').hidden = !conf || !inn;
+    if (!inn) return;
+    const s = st || sync.status();
+    $('#acc-status').textContent =
+      s.phase === 'syncing' ? 'Sincronizando…' :
+      s.phase === 'offline' ? `Conectado como ${s.email}. Sin conexión: se reintentará sola.` :
+      s.phase === 'error' ? `Conectado como ${s.email}. ${s.error}` :
+      `Conectado como ${s.email}. Última sincronización: ${ago(s.last)}.`;
+    $('#acc-sync').disabled = s.phase === 'syncing';
+  }
+
+  function accMsg(text, isErr) {
+    const m = $('#acc-msg');
+    m.textContent = text || '';
+    m.classList.toggle('err', !!isErr);
+  }
+
+  // Lo que llegó de otro equipo ya está mezclado en el estado: se refresca la pantalla
+  function applyMerged() {
+    rollover();
+    window.PoquitoSync.stamp(state);
+    window.api.save(state);
+    if (!editingId) render();
+  }
+
+  async function accRun(fn) {
+    const btns = document.querySelectorAll('#account .btn');
+    btns.forEach((b) => { b.disabled = true; });
+    accMsg('');
+    try { await fn(); } catch (e) { accMsg(e.message || 'No se pudo completar.', true); }
+    btns.forEach((b) => { b.disabled = false; });
+    renderAccount();
+  }
+
+  function bindAccount() {
+    const creds = () => ({ email: $('#acc-email').value.trim(), pass: $('#acc-pass').value });
+    $('#acc-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const { email, pass } = creds();
+      if (!email || !pass) { accMsg('Escribe tu correo y tu contraseña.', true); return; }
+      accRun(async () => {
+        await sync.signIn(email, pass);
+        $('#acc-pass').value = '';
+        accMsg('Listo. Sincronizando tus tareas…');
+        await sync.syncNow();
+        accMsg('');
+      });
+    });
+    $('#acc-signup').addEventListener('click', () => {
+      const { email, pass } = creds();
+      if (!email || !pass) { accMsg('Escribe un correo y una contraseña para crear la cuenta.', true); return; }
+      accRun(async () => {
+        const r = await sync.signUp(email, pass);
+        $('#acc-pass').value = '';
+        if (r.needsConfirm) { accMsg('Te enviamos un correo para confirmar la cuenta. Después, inicia sesión aquí.'); return; }
+        accMsg('Cuenta creada. Sincronizando tus tareas…');
+        await sync.syncNow();
+        accMsg('');
+      });
+    });
+    $('#acc-sync').addEventListener('click', () => accRun(async () => { await sync.syncNow(); }));
+    $('#acc-out').addEventListener('click', () => accRun(async () => {
+      await sync.signOut();
+      accMsg('Sesión cerrada. Tus tareas siguen en este teléfono.');
+    }));
+  }
+
   /* ---------- Ajustes ---------- */
   function openSettings() {
+    renderAccount();
     const s = state.settings;
     $('#set-morning').checked = !!s.morningEnabled;
     $('#set-time').value = s.morningTime || '09:00';
@@ -739,6 +826,7 @@
     bindGestures();
     bindSheet();
     bindSettings();
+    bindAccount();
 
     // Cuando vuelves a la app (o cambia el día) se actualiza todo
     document.addEventListener('visibilitychange', () => { if (!document.hidden) checkDay(); });
@@ -751,6 +839,7 @@
       } else {
         checkDay();
       }
+      if (sync && sync.signedIn()) sync.syncNow();      // al volver a la app se ponen al día los equipos
     });
     // Botón "atrás" de Android: cierra lo que esté abierto; si no, deja la app en segundo plano
     window.api.onBack(() => {
@@ -784,6 +873,15 @@
     if (rollover()) save();
     render();
     setInterval(checkDay, 60000);
+
+    sync = window.PoquitoSync.create({
+      config: window.POQUITO_SYNC,
+      store: { get: () => window.api.sessionGet(), set: (v) => window.api.sessionSet(v) },
+      getState: () => state,
+      onMerged: applyMerged,
+      onStatus: (st) => { if (!$('#settings').hidden) renderAccount(st); },
+    });
+    await sync.start();
   }
 
   init();

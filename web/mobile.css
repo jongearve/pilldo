@@ -197,3 +197,15 @@ button, input, select { touch-action: manipulation; }
 .wk.can-drop { outline: 2px dashed var(--line-strong); outline-offset: -2px; }
 .wk.drop-hover { background: var(--todo); color: var(--ink); outline-color: var(--ink); }
 .wk.drop-hover .wk-l { color: var(--ink); }
+
+/* Cuenta */
+.account { padding: 6px 4px 16px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
+.acc-title { font-size: 16px; margin-bottom: 4px; }
+.acc-help { font-size: 14px; color: var(--muted); line-height: 1.45; margin-bottom: 10px; }
+.acc-help code { font-size: 12.5px; background: var(--surface); padding: 1px 6px; border-radius: 6px; }
+.acc-input { display: block; width: 100%; margin-bottom: 10px; user-select: text; -webkit-user-select: text; }
+.acc-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px; }
+.acc-msg { font-size: 14px; margin-top: 10px; min-height: 1em; color: var(--muted); }
+.acc-msg.err { color: #e0708a; }
+@media (prefers-color-scheme: light) { .acc-msg.err { color: #b3324f; } }
+#acc-form[hidden], #acc-in[hidden], #acc-unconf[hidden] { display: none; }

@@ -62,6 +62,9 @@ window.POQUITO_SYNC = {
 
 5. Escritorio: cierra y vuelve a abrir Poquito. Android: sube los archivos a GitHub y descarga el APK nuevo.
 
+**Ojo al actualizar:** cada zip nuevo trae `sync-config.js` vacío. Al copiar los archivos nuevos, **no reemplaces
+ese archivo** (o vuelve a pegar tus datos después).
+
 ## 5. Usarlo
 1. En la app: **Ajustes → Cuenta y sincronización → Crear cuenta** (correo y contraseña de 6 o más caracteres).
 2. En el otro dispositivo: **Iniciar sesión** con el mismo correo y contraseña.

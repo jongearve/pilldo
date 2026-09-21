@@ -8,6 +8,7 @@ import { Haptics, ImpactStyle } from '@capacitor/haptics';
 const native = Capacitor.isNativePlatform();
 const PoquitoWidget = native ? registerPlugin('PoquitoWidget') : null;
 const KEY = 'poquito-state-v1';
+const SESSION_KEY = 'poquito-session-v1';
 
 const pad = (n) => String(n).padStart(2, '0');
 const dateKey = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
@@ -16,6 +17,10 @@ const clip = (s, n = 80) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
 const defaultState = () => ({
   tasks: [],
   routines: [],
+  energy: {},
+  energyAt: {},
+  tomb: {},
+  jar: [],
   settings: {
     morningEnabled: true,
     morningTime: '09:00',
@@ -46,6 +51,10 @@ function parseState(raw) {
   return {
     tasks: Array.isArray(p.tasks) ? p.tasks : [],
     routines: Array.isArray(p.routines) ? p.routines : [],
+    energy: p.energy && typeof p.energy === 'object' ? p.energy : {},
+    energyAt: p.energyAt && typeof p.energyAt === 'object' ? p.energyAt : {},
+    tomb: p.tomb && typeof p.tomb === 'object' ? p.tomb : {},
+    jar: Array.isArray(p.jar) ? p.jar : [],
     settings: { ...base.settings, ...(p.settings || {}) },
     meta: { ...base.meta, ...(p.meta || {}) },
   };
@@ -220,6 +229,18 @@ window.api = {
       if (theirs > mine) { currentState = fresh; reschedule(fresh); return fresh; }
     } catch { /* nada */ }
     return null;
+  },
+
+  // Sesión de la cuenta (correo) para sincronizar
+  async sessionGet() {
+    try { const { value } = await Preferences.get({ key: SESSION_KEY }); return value || null; } catch { return null; }
+  },
+  async sessionSet(v) {
+    try {
+      if (v == null) await Preferences.remove({ key: SESSION_KEY });
+      else await Preferences.set({ key: SESSION_KEY, value: String(v) });
+      return true;
+    } catch { return false; }
   },
 
   requestNotifications,
